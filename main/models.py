@@ -18,6 +18,8 @@ class Todo(models.Model):
     description = models.TextField()
     image = models.ImageField(upload_to=slugify_upload, blank=True, null=True)
     expires_at = models.DateTimeField(auto_now_add=True)
+    price = models.FloatField(blank=True, null=True)
+    color = models.CharField(max_length=30, blank=True, null=True)
 
     def save(
         self, *args, **kwargs

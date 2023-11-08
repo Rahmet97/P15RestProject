@@ -1,26 +1,32 @@
 import datetime
+from datetime import timedelta
 
 from django.db.models import Q
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
 
 from accounts.permissions import AdminPermission
 from .models import Todo, Category
-from .serializers import TodoSerializer, CategorySerializer
+from .serializers import TodoSerializer, CategorySerializer, QuerySerializer, TodoSerializerForFilter
 
 
-class TodoAPIView(APIView):
+class TodoAPIView(GenericAPIView):
     permission_classes = ()
+    serializer_class = TodoSerializer
 
     def get(self, request):
         todos = Todo.objects.all()
+        # todos = Todo.objects.filter(Q(expires_at__gte=datetime.datetime.now() - timedelta(days=3)) & Q(expires_at__lte=datetime.datetime.now()))
         todos_data = TodoSerializer(todos, many=True)
         return Response(todos_data.data)
 
 
-class CreateTodoAPIView(APIView):
+class CreateTodoAPIView(GenericAPIView):
     permission_classes = (AdminPermission,)
+    serializer_class = TodoSerializer
 
     def post(self, request):
         todo_serializer = TodoSerializer(data=request.data)
@@ -29,7 +35,8 @@ class CreateTodoAPIView(APIView):
         return Response(todo_serializer.data)
 
 
-class TodoUpdateAPIView(APIView):
+class TodoUpdateAPIView(GenericAPIView):
+    serializer_class = TodoSerializer
 
     def get(self, request, pk):
         todo = Todo.objects.get(pk=pk)
@@ -64,8 +71,9 @@ class TodoUpdateAPIView(APIView):
         return Response(status=204)
 
 
-class TodoDetailAPIView(APIView):
+class TodoDetailAPIView(GenericAPIView):
     permission_classes = ()
+    serializer_class = TodoSerializer
 
     def get(self, request, slug):
         try:
@@ -76,17 +84,56 @@ class TodoDetailAPIView(APIView):
         return Response(todo_serializer.data)
 
 
-class SearchAPIView(APIView):
+class SearchAPIView(GenericAPIView):
     permission_classes = ()
+    serializer_class = CategorySerializer
 
+    @swagger_auto_schema(query_serializer=QuerySerializer)
     def get(self, request):
         query = request.GET.get('query')
-        categories = Category.objects.filter(name__icontains=query) # & Q(parent=None))
+        base_categories = Category.objects.filter(Q(name__icontains=query) & Q(parent=None)).values('tree_id')
+        categories = Category.objects.filter(tree_id__in=base_categories)
         # categories_data = []
         # for category in categories:
-        #     cate = Category.objects.filter(tree_id=category.id)
-        #     category_serializer = CategorySerializer(cate)
+        #     cate = Category.objects.filter(tree_id=category.tree_id)
+        #     category_serializer = CategorySerializer(cate, many=True)
         #     categories_data.append(category_serializer.data)
-        # return Response(categories_data)
         category_serializer = CategorySerializer(categories, many=True)
         return Response(category_serializer.data)
+
+
+class TodoFilterAPIView(GenericAPIView):
+    permission_classes = ()
+    serializer_class = TodoSerializer
+
+    @swagger_auto_schema(query_serializer=TodoSerializerForFilter)
+    def get(self, request):
+        start = request.GET.get('start', 0)
+        end = request.GET.get('end', 999999999999)
+        name = request.GET.get('name', '')
+        category_name = request.GET.get('category_name', '')
+        date = request.GET.get('date', None)
+        color = request.GET.get('color', '')
+
+        price_query = Q(price__gte=start) & Q(price__lte=end)
+
+        if name == '':
+            title_query = Q()
+        else:
+            title_query = Q(title__icontains=name)
+
+        if not date:
+            date_query = Q()
+        else:
+            date_query = Q(expires_at=date)
+
+        if color == '':
+            color_query = Q()
+        else:
+            color_query = Q(color=color)
+
+        q = price_query & title_query & date_query & color_query
+
+        todos = Todo.objects.filter(q)
+        todo_serializer = TodoSerializer(todos, many=True)
+        return Response(todo_serializer.data)
