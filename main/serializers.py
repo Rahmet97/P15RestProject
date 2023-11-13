@@ -34,3 +34,7 @@ class TodoSerializerForFilter(serializers.Serializer):
     end = serializers.FloatField(required=False)
     color = serializers.CharField(required=False)
     date = serializers.DateTimeField(required=False)
+
+
+class SlugSerializer(serializers.Serializer):
+    slug = serializers.CharField()

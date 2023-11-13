@@ -3,84 +3,114 @@ from datetime import timedelta
 
 from django.db.models import Q
 from drf_yasg.utils import swagger_auto_schema
+from elasticsearch_dsl import Search
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView, CreateAPIView, RetrieveUpdateDestroyAPIView, \
+    RetrieveAPIView
 
 from accounts.permissions import AdminPermission
 from .models import Todo, Category
-from .serializers import TodoSerializer, CategorySerializer, QuerySerializer, TodoSerializerForFilter
+from .serializers import TodoSerializer, CategorySerializer, QuerySerializer, TodoSerializerForFilter, SlugSerializer
 
 
-class TodoAPIView(GenericAPIView):
-    permission_classes = ()
+# class TodoAPIView(GenericAPIView):
+#     permission_classes = ()
+#     serializer_class = TodoSerializer
+#
+#     def get(self, request):
+#         todos = Todo.objects.all()
+#         # todos = Todo.objects.filter(Q(expires_at__gte=datetime.datetime.now() - timedelta(days=3)) & Q(expires_at__lte=datetime.datetime.now()))
+#         todos_data = TodoSerializer(todos, many=True)
+#         return Response(todos_data.data)
+
+class TodoAPIView(ListAPIView):
+    queryset = Todo.objects.all()
     serializer_class = TodoSerializer
-
-    def get(self, request):
-        todos = Todo.objects.all()
-        # todos = Todo.objects.filter(Q(expires_at__gte=datetime.datetime.now() - timedelta(days=3)) & Q(expires_at__lte=datetime.datetime.now()))
-        todos_data = TodoSerializer(todos, many=True)
-        return Response(todos_data.data)
+    permission_classes = ()
 
 
-class CreateTodoAPIView(GenericAPIView):
+# class CreateTodoAPIView(GenericAPIView):
+#     permission_classes = (AdminPermission,)
+#     serializer_class = TodoSerializer
+
+    # def post(self, request):
+    #     todo_serializer = TodoSerializer(data=request.data)
+    #     todo_serializer.is_valid(raise_exception=True)
+    #     todo_serializer.save()
+    #     return Response(todo_serializer.data)
+
+class CreateTodoAPIView(CreateAPIView):
+    queryset = Todo.objects.all()
+    serializer_class = TodoSerializer
     permission_classes = (AdminPermission,)
+
+
+# class TodoUpdateAPIView(GenericAPIView):
+#     serializer_class = TodoSerializer
+#
+#     def get(self, request, pk):
+#         todo = Todo.objects.get(pk=pk)
+#         todo_serializer = TodoSerializer(todo)
+#         return Response(todo_serializer.data)
+#
+#     def put(self, request, pk):
+#         title = request.POST.get('title')
+#         description = request.POST.get('description')
+#         todo = Todo.objects.get(pk=pk)
+#         todo.title = title
+#         todo.description = description
+#         todo.expires_at = datetime.datetime.now()
+#         todo.save()
+#         todo_serializer = TodoSerializer(todo)
+#         return Response(todo_serializer.data)
+#
+#     def patch(self, request, pk):
+#         title = request.POST.get('title', None)
+#         description = request.POST.get('description', None)
+#         todo = Todo.objects.get(pk=pk)
+#         if title:
+#             todo.title = title
+#         if description:
+#             todo.description = description
+#         todo.save()
+#         todo_serializer = TodoSerializer(todo)
+#         return Response(todo_serializer.data)
+#
+#     def delete(self, request, pk):
+#         Todo.objects.get(pk=pk).delete()
+#         return Response(status=204)
+
+class TodoUpdateAPIView(RetrieveUpdateDestroyAPIView):
+    queryset = Todo.objects.all()
     serializer_class = TodoSerializer
-
-    def post(self, request):
-        todo_serializer = TodoSerializer(data=request.data)
-        todo_serializer.is_valid(raise_exception=True)
-        todo_serializer.save()
-        return Response(todo_serializer.data)
+    permission_classes = (IsAuthenticated,)
 
 
-class TodoUpdateAPIView(GenericAPIView):
+# class TodoDetailAPIView(GenericAPIView):
+#     permission_classes = ()
+#     serializer_class = TodoSerializer
+#
+#     def get(self, request, slug):
+#         try:
+#             todo = Todo.objects.get(slug=slug)
+#         except Todo.DoesNotExist:
+#             return Response({'success': False}, status=404)
+#         todo_serializer = TodoSerializer(todo)
+#         return Response(todo_serializer.data)
+class TodoDetailAPIView(RetrieveAPIView):
     serializer_class = TodoSerializer
-
-    def get(self, request, pk):
-        todo = Todo.objects.get(pk=pk)
-        todo_serializer = TodoSerializer(todo)
-        return Response(todo_serializer.data)
-
-    def put(self, request, pk):
-        title = request.POST.get('title')
-        description = request.POST.get('description')
-        todo = Todo.objects.get(pk=pk)
-        todo.title = title
-        todo.description = description
-        todo.expires_at = datetime.datetime.now()
-        todo.save()
-        todo_serializer = TodoSerializer(todo)
-        return Response(todo_serializer.data)
-
-    def patch(self, request, pk):
-        title = request.POST.get('title', None)
-        description = request.POST.get('description', None)
-        todo = Todo.objects.get(pk=pk)
-        if title:
-            todo.title = title
-        if description:
-            todo.description = description
-        todo.save()
-        todo_serializer = TodoSerializer(todo)
-        return Response(todo_serializer.data)
-
-    def delete(self, request, pk):
-        Todo.objects.get(pk=pk).delete()
-        return Response(status=204)
-
-
-class TodoDetailAPIView(GenericAPIView):
     permission_classes = ()
-    serializer_class = TodoSerializer
 
-    def get(self, request, slug):
-        try:
-            todo = Todo.objects.get(slug=slug)
-        except Todo.DoesNotExist:
-            return Response({'success': False}, status=404)
-        todo_serializer = TodoSerializer(todo)
+    @swagger_auto_schema(query_serializer=SlugSerializer)
+    def get(self, request):
+        slug = self.request.query_params.get('slug', None)
+        if slug is not None:
+            todo = Todo.objects.filter(slug=slug).first()
+        else:
+            todo = Todo.objects.first()
+        todo_serializer = self.get_serializer(todo)
         return Response(todo_serializer.data)
 
 
