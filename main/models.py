@@ -18,7 +18,7 @@ class Todo(models.Model):
     description = models.TextField()
     image = models.ImageField(upload_to=slugify_upload, blank=True, null=True)
     expires_at = models.DateTimeField(auto_now_add=True)
-    price = models.FloatField(blank=True, null=True)
+    price = models.FloatField()
     color = models.CharField(max_length=30, blank=True, null=True)
 
     def save(
@@ -42,3 +42,11 @@ class Category(MPTTModel):
     class Meta:
         verbose_name = 'Category'
         verbose_name_plural = 'Categories'
+
+
+class Subscriber(models.Model):
+    email = models.EmailField()
+    subscribed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.email
